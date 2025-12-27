@@ -1,6 +1,5 @@
 import serial
 import time
-from datetime import datetime
 import json
 import tkinter as tk
 from tkinter import ttk
