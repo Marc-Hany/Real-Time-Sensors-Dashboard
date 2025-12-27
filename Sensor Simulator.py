@@ -5,63 +5,54 @@ import json
 import tkinter as tk
 from tkinter import ttk
 
-current_time=datetime.now()
-
 class Sensor:
-    # Constructor method to initialize new objects
-    def __init__(self, name, value,Timestamp,Status):
-        self.name = name                # Instance attribute
-        self.value = value              # Instance attribute
-        self.Timestamp = Timestamp      # Instance attribute
-        self.Status = Status            # Instance attribute
+    def __init__(self, name, value, status):
+        self.name = name
+        self.value = value
+        self.status = status
 
-    
     def send_sensor_data(self):
-
-        # 1. Prepare data dictionary
         data = {
             "name": self.name,
             "value": self.value,
-            "timestamp": int(time.time()),
-            "status": self.Status
+            "timestamp": int(time.time()), # Generates fresh timestamp on send
+            "status": self.status
         }
-        
-        # 2. Serialize to a JSON string and add newline
-        # Using json.dumps ensures proper formatting
         json_payload = json.dumps(data) + "\n"
-        
-        # 3. Encode and send
         ser.write(json_payload.encode('utf-8'))
         print(f"Sent JSON: {json_payload.strip()}")
 
 
+# --- Serial Setup ---
+try:
+    # Open serial port (UART init)
+    ser = serial.Serial(
+        port='COM1',        # change this to your COM port
+        baudrate=115200,
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+        timeout=1           # seconds
+    )
+    time.sleep(1)
+except Exception as e:
+    print(f"Serial Error: {e}. Running in simulation mode (no hardware).")
+    ser = None
 
-# 1. Open serial port (UART init)
-ser = serial.Serial(
-    port='COM1',        # change this to your COM port
-    baudrate=115200,
-    bytesize=serial.EIGHTBITS,
-    parity=serial.PARITY_NONE,
-    stopbits=serial.STOPBITS_ONE,
-    timeout=1           # seconds
-)
 
-# Give the port time to initialize
-time.sleep(1)
-
-# Create an instance (object)
-temp_sensor = Sensor("Temp",25,current_time,"OK")
+# Create temperature sensor
+temp_sensor = Sensor("Temp",25,"OK")
 
 # --- GUI Functions ---
 def handle_send():
     # 1. Update the object with current GUI values
     temp_sensor.value = round(slider.get(), 2)
-    temp_sensor.Status = status_var.get()
+    temp_sensor.status = status_var.get()
     
     # 2. Trigger the class method
     if ser:
         temp_sensor.send_sensor_data()
-        log.insert(tk.END, f"Sent: {temp_sensor.value}, {temp_sensor.Status}\n")
+        log.insert(tk.END, f"Sent: {temp_sensor.value}, {temp_sensor.status}\n")
     else:
         log.insert(tk.END, "Error: Serial Port Not Found\n")
     log.see(tk.END)
@@ -80,7 +71,7 @@ slider.pack(pady=5)
 
 # Status Control
 tk.Label(root, text="Select Status:").pack(pady=(10, 0))
-status_var = tk.StringVar(value=temp_sensor.Status)
+status_var = tk.StringVar(value=temp_sensor.status)
 status_menu = ttk.Combobox(root, textvariable=status_var, values=("OK", "WARNING", "ERROR"), state="readonly")
 status_menu.pack(pady=5)
 
