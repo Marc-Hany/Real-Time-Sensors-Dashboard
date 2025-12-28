@@ -21,7 +21,7 @@ class Sensor:
         }
         json_payload = json.dumps(data) + "\n"
         ser.write(json_payload.encode('utf-8'))
-        print(f"Sent JSON: {json_payload.strip()}")
+        # print(f"Sent JSON: {json_payload.strip()}")
 
     def update_value(self,val):
          # If original value was int, store as int; otherwise float
@@ -74,7 +74,7 @@ def handle_send():
             # Log to screen
             log.insert(tk.END, f"[{sensor.name}] Value: {sensor.value}, Status: {sensor.status}\n")
             log.see(tk.END)
-        root.after(200,handle_send)
+        root.after(500,handle_send)
 # --- 3. Building the UI ---
 root = tk.Tk()
 root.title("Sensors Dashboard")
@@ -134,7 +134,7 @@ for s in my_sensors:
 log = tk.Text(root, height=10, width=50)
 log.pack(padx=20, pady=10)
 
-root.after(200,handle_send)
+root.after(500,handle_send)
 root.mainloop()
 
 if ser: ser.close()
