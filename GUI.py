@@ -1,9 +1,13 @@
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView)
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,QLabel)
 from PySide6.QtCore import QObject, QThread, Signal
-import time
-import sys
+from PySide6.QtCore import QTimer
+from datetime import datetime
+import pyqtgraph as pg
 import serial
+import time
 import json
+import sys
+
 
 # 1. Define the Worker logic
 class Worker(QObject):
@@ -12,23 +16,81 @@ class Worker(QObject):
     def __init__(self):
         super().__init__()
         self._running = True
+                #  --- Serial Setup ---
+        try:
+            # Open serial port (UART init)
+            self.ser = serial.Serial(
+                port='COM2',        # change this to your COM port
+                baudrate=115200,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=1           # seconds
+            )
+            time.sleep(1)
+        except Exception as e:
+            print(f"Serial Error: {e}. Running in simulation mode (no hardware).")
+            self.ser = None
 
     def run(self):
         while self._running:
-            if ser and ser.is_open:
-                # readline() reads until \n and returns bytes
-                line = ser.readline()
-                
-                # Convert bytes to string and remove trailing whitespace (\n, \r)
-                decoded_line = line.decode('utf-8').strip()
-                if decoded_line:
-                    # 2. Parse the JSON string into a Python dictionary
-                    data = json.loads(decoded_line)
-                    print(data)
-                    self.data_ready.emit(data)    # emit signal instead of queue
+            if self.ser and self.ser.is_open:
+                try:
+                    # readline() reads until \n and returns bytes
+                    line = self.ser.readline()
+                    
+                    # Convert bytes to string and remove trailing whitespace (\n, \r)
+                    decoded_line = line.decode('utf-8').strip()
+                    if decoded_line:
+                        # 2. Parse the JSON string into a Python dictionary
+                        data = json.loads(decoded_line)
+                        # print(data)
+                        self.data_ready.emit(data)    # emit signal instead of queue
+                except Exception as e:
+                    print(f"Error: {e}")
+                time.sleep(0.1)
 
     def stop(self):
         self._running = False
+
+
+class SensorPlotWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+
+        self.time_data = []   # timestamps (seconds)
+        self.value_data = []  # sensor values
+        self.window = 20      # seconds
+
+        self.plot = pg.PlotWidget()
+        self.plot.setBackground("w")
+        self.plot.showGrid(x=True, y=True)
+
+        self.curve = self.plot.plot(pen=pg.mkPen(color="b", width=2))
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.plot)
+
+    def add_point(self, value, timestamp):
+        # 1. Append new data
+        self.time_data.append(timestamp)
+        self.value_data.append(value)
+
+        # 2. Remove old data (rolling window)
+        cutoff = time.time() - self.window
+        while self.time_data and self.time_data[0] < cutoff:
+            self.time_data.pop(0)
+            self.value_data.pop(0)
+
+        # 3. Convert to relative time (0 → window seconds)
+        t0 = self.time_data[0]
+        x = [t - t0 for t in self.time_data]
+
+        # 4. Update plot
+        self.curve.setData(x, self.value_data)
+
 
 
 class MainWindow(QWidget):
@@ -39,9 +101,9 @@ class MainWindow(QWidget):
 
         # 1. Setup Table
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Sensor Name", "Value","Timestamp","Status"])
-        
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["Sensor Name", "Value","Timestamp","Status","Plot"])
+
         # Make columns stretch to fit window
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
@@ -55,42 +117,78 @@ class MainWindow(QWidget):
         }
         self.table.setRowCount(len(self.sensor_rows))
 
+        self.value_items = {}
+        self.timestamp_items = {}
+        self.status_items = {}
         # Initialize table with sensor names
         for name, row in self.sensor_rows.items():
             self.table.setItem(row, 0, QTableWidgetItem(name))
-            self.table.setItem(row, 1, QTableWidgetItem("---"))
-            self.table.setItem(row, 2, QTableWidgetItem("---"))
-            self.table.setItem(row, 3, QTableWidgetItem("---"))
+
+            value_item = QTableWidgetItem("---")
+            timestamp_item = QTableWidgetItem("---")
+            status_item = QTableWidgetItem("---")
+
+            self.table.setItem(row, 1, value_item)
+            self.table.setItem(row, 2, timestamp_item)
+            self.table.setItem(row, 3, status_item)
+
+            self.value_items[name] = value_item
+            self.timestamp_items[name] = timestamp_item
+            self.status_items[name] = status_item
+
+        self.plot_widgets = {}
+
+        for name, row in self.sensor_rows.items():
+            plot_widget = SensorPlotWidget()
+            self.table.setCellWidget(row, 4, plot_widget)
+            self.plot_widgets[name] = plot_widget
+
+            self.table.setRowHeight(row, 150)
+
+        self.table.setColumnWidth(4, 300)
+
+
+        # 1. Create the Label
+        self.indicator = QLabel("System Status")
+        self.indicator.setStyleSheet("background-color: red; color: white; padding: 5px; font-weight: bold;")
+
 
         layout = QVBoxLayout(self)
+
+        # 3. Add Label FIRST (Top)
+        layout.addWidget(self.indicator)
+
         layout.addWidget(self.table)
 
-    def update_table(self,data):
+        
+    def update_table(self, data):
         name = data.get("name")
         if name in self.sensor_rows:
-            row = self.sensor_rows[name]
-            # Update specific cells
-            self.table.setItem(row, 1, QTableWidgetItem(str(data.get("value"))))
-            self.table.setItem(row, 2, QTableWidgetItem(str(data.get("timestamp"))))
-            self.table.setItem(row, 3, QTableWidgetItem(data.get("status")))
+            self.value_items[name].setText(str(data.get("value")))
+            self.timestamp_items[name].setText(str(datetime.fromtimestamp(data.get("timestamp"))))
+            self.status_items[name].setText(data.get("status"))
+            # Update plot
+            self.plot_widgets[name].add_point(data.get("value"),data.get("timestamp"))
 
+        # 2. Extract all current statuses from the table items
+        # This checks if ANY sensor row currently says something other than "OK"
+        current_statuses = [item.text() for item in self.status_items.values()]
+        
+        if any(s != "OK" for s in current_statuses):
+            self.update_status("FAULT")
+            self.indicator.setText("System Status: FAULT DETECTED")
+        else:
+            self.update_status("OK")
+            self.indicator.setText("System Status: ALL OK")
 
+    def update_status(self, status):
+        if status == "OK":
+            # Green background with rounded corners
+            self.indicator.setStyleSheet("background-color: green; border-radius: 10px;")
+        else:
+            self.indicator.setStyleSheet("background-color: red; border-radius: 10px;")
+                
 
-#  --- Serial Setup ---
-try:
-    # Open serial port (UART init)
-    ser = serial.Serial(
-        port='COM2',        # change this to your COM port
-        baudrate=115200,
-        bytesize=serial.EIGHTBITS,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        timeout=1           # seconds
-    )
-    time.sleep(1)
-except Exception as e:
-    print(f"Serial Error: {e}. Running in simulation mode (no hardware).")
-    ser = None
 
 app = QApplication(sys.argv)
 
