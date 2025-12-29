@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import (QApplication, QMainWindow,QWidget, QLabel, QVBoxLayout)
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtWidgets import (QApplication,QWidget, QLabel, QVBoxLayout)
+from PySide6.QtCore import QObject, QThread, Signal
 import time
 import sys
 import random
@@ -27,8 +27,6 @@ class Worker(QObject):
                     data = json.loads(decoded_line)
                     print(data)
                     self.data_ready.emit(data)    # emit signal instead of queue
-            else:
-                print("shit")
 
     def stop(self):
         self._running = False
@@ -41,11 +39,13 @@ class SensorCard(QWidget):
         self.name=name
         self.name_label = QLabel(name)
         self.value_label = QLabel("Value: ---")
+        self.time_label = QLabel("Timestamp: ---")
         self.status_label = QLabel("Status: ---")
 
         layout = QVBoxLayout()
         layout.addWidget(self.name_label)
         layout.addWidget(self.value_label)
+        layout.addWidget(self.time_label)
         layout.addWidget(self.status_label)
 
         self.setLayout(layout)
@@ -54,7 +54,9 @@ class SensorCard(QWidget):
         if data["name"]==self.name:
             value= data["value"]
             status= data["status"]
+            timestamp=data["timestamp"]
             self.value_label.setText(f"Value: {value}")
+            self.time_label.setText(f"Timestamp: {timestamp}")
             self.status_label.setText(f"Status: {status}")
 
 
