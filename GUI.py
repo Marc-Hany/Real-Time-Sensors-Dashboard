@@ -1,9 +1,10 @@
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,QLabel)
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,QLabel,QPlainTextEdit)
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtCore import QTimer
 from datetime import datetime
 import pyqtgraph as pg
+import traceback
 import serial
 import time
 import json
@@ -49,7 +50,6 @@ class Worker(QObject):
                         self.data_ready.emit(data)    # emit signal instead of queue
                 except Exception as e:
                     print(f"Error: {e}")
-                time.sleep(0.1)
 
     def stop(self):
         self._running = False
@@ -154,35 +154,53 @@ class MainWindow(QWidget):
 
         self.table.setColumnWidth(4, 300)
 
-
+        self.value_alarm_active = {name: False for name in self.sensor_rows}
+        
         # 1. Create the Label
         self.indicator = QLabel("System Status")
         self.indicator.setStyleSheet("background-color: red; color: white; padding: 5px; font-weight: bold;")
 
+        self.log_header = QLabel("<b>Alarm & Event History</b>")
+        self.alarm_log = QPlainTextEdit()
+        self.alarm_log.setReadOnly(True)
+        self.alarm_log.setMaximumBlockCount(100) # Keep only the last 100 entries
+        self.alarm_log.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: Consolas;")
+        
 
         layout = QVBoxLayout(self)
 
         # 3. Add Label FIRST (Top)
         layout.addWidget(self.indicator)
-
         layout.addWidget(self.table)
+        layout.addWidget(self.log_header)
+        layout.addWidget(self.alarm_log)
 
         
     def update_table(self, data):
-        name = data.get("name")
-        val=data.get("value")
-        if name in self.sensor_rows:
-            self.value_items[name].setText(str(data.get("value")))
-            self.timestamp_items[name].setText(str(datetime.fromtimestamp(data.get("timestamp"))))
-            self.status_items[name].setText(data.get("status"))
-            # Update plot
-            self.plot_widgets[name].add_point(data.get("value"),data.get("timestamp"))
-            if self.sensor_ranges[name][0] <= val <= self.sensor_ranges[name][1] :
-                for col in range(self.table.columnCount()-1):
-                    self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush("#433F3F"))
-            else:
-                for col in range(self.table.columnCount()-1):
-                    self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush("#F70707"))
+        try:
+            name = data.get("name")
+            val=data.get("value")
+            if name in self.sensor_rows:
+                self.value_items[name].setText(str(data.get("value")))
+                self.timestamp_items[name].setText(str(datetime.fromtimestamp(data.get("timestamp"))))
+                self.status_items[name].setText(data.get("status"))
+                # Update plot
+                self.plot_widgets[name].add_point(data.get("value"),data.get("timestamp"))
+                if self.sensor_ranges[name][0] <= val <= self.sensor_ranges[name][1] :
+                    for col in range(4):
+                        self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#433F3F")))
+                        self.value_alarm_active[name]=False
+                else:
+                    for col in range(4):
+                        self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
+                        if self.value_alarm_active[name]==False:
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            log_entry = f"[{timestamp}] ALARM: {name} out of range! (Value: {val})"
+                            self.alarm_log.appendPlainText(log_entry)
+                            self.value_alarm_active[name]=True
+        except:
+            print("CRASH INSIDE update_table:", e)
+            traceback.print_exc()
                 
         # 2. Extract all current statuses from the table items
         # This checks if ANY sensor row currently says something other than "OK"
