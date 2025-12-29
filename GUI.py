@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,QLabel)
 from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtGui import QColor, QBrush
 from PySide6.QtCore import QTimer
 from datetime import datetime
 import pyqtgraph as pg
@@ -107,6 +108,12 @@ class MainWindow(QWidget):
         # Make columns stretch to fit window
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+        self.sensor_ranges = {"Temperature": (-50.0, 50.0),
+                              "Humidity": (10.0, 90.0),
+                              "Pressure": (100.0, 900.0),
+                              "Speed": (50.0, 200.0),
+                              "Counter": (10.0, 400.0)}
+
         # 2. Define rows for each sensor
         self.sensor_rows = {
             "Temperature": 0,
@@ -163,13 +170,20 @@ class MainWindow(QWidget):
         
     def update_table(self, data):
         name = data.get("name")
+        val=data.get("value")
         if name in self.sensor_rows:
             self.value_items[name].setText(str(data.get("value")))
             self.timestamp_items[name].setText(str(datetime.fromtimestamp(data.get("timestamp"))))
             self.status_items[name].setText(data.get("status"))
             # Update plot
             self.plot_widgets[name].add_point(data.get("value"),data.get("timestamp"))
-
+            if self.sensor_ranges[name][0] <= val <= self.sensor_ranges[name][1] :
+                for col in range(self.table.columnCount()-1):
+                    self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush("#433F3F"))
+            else:
+                for col in range(self.table.columnCount()-1):
+                    self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush("#F70707"))
+                
         # 2. Extract all current statuses from the table items
         # This checks if ANY sensor row currently says something other than "OK"
         current_statuses = [item.text() for item in self.status_items.values()]
