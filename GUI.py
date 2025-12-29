@@ -27,7 +27,6 @@ class Worker(QObject):
                     data = json.loads(decoded_line)
                     print(data)
                     self.data_ready.emit(data)    # emit signal instead of queue
-                    time.sleep(0.1)
             else:
                 print("shit")
 
