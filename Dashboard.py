@@ -2,6 +2,11 @@ import serial
 import time
 import json
 import threading
+from queue import Queue
+from queue import Empty
+
+sensor_queue = Queue()
+
 
 def read_serial_line(ser):
     """
@@ -18,7 +23,8 @@ def read_serial_line(ser):
             if decoded_line:
                     # 2. Parse the JSON string into a Python dictionary
                     data = json.loads(decoded_line)
-                    print(data)
+                    sensor_queue.put(data)
+                    # print(data)
                     # 3. Extract specific values using their keys
                     # Example: If your JSON is {"name": "Temp", "value": 25.5}
                     name = data.get("name", "Unknown")
@@ -56,5 +62,8 @@ t.start()
 
 # Main thread continues
 while True:
-    print("Main thread running")
-    time.sleep(2)
+    try:
+        data = sensor_queue.get_nowait()
+        print(data)
+    except Empty:
+        pass
