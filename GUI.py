@@ -1,8 +1,7 @@
-from PySide6.QtWidgets import (QApplication,QWidget, QLabel, QVBoxLayout)
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView)
 from PySide6.QtCore import QObject, QThread, Signal
 import time
 import sys
-import random
 import serial
 import json
 
@@ -32,32 +31,49 @@ class Worker(QObject):
         self._running = False
 
 
-class SensorCard(QWidget):
-    def __init__(self, name):
+class MainWindow(QWidget):
+    def __init__(self):
         super().__init__()
+        self.setWindowTitle("Sensor Data Table")
+        self.resize(400, 300)
 
-        self.name=name
-        self.name_label = QLabel(name)
-        self.value_label = QLabel("Value: ---")
-        self.time_label = QLabel("Timestamp: ---")
-        self.status_label = QLabel("Status: ---")
+        # 1. Setup Table
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Sensor Name", "Value","Timestamp","Status"])
+        
+        # Make columns stretch to fit window
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.name_label)
-        layout.addWidget(self.value_label)
-        layout.addWidget(self.time_label)
-        layout.addWidget(self.status_label)
+        # 2. Define rows for each sensor
+        self.sensor_rows = {
+            "Temperature": 0,
+            "Humidity": 1,
+            "Pressure": 2,
+            "Speed": 3,
+            "Counter": 4
+        }
+        self.table.setRowCount(len(self.sensor_rows))
 
-        self.setLayout(layout)
+        # Initialize table with sensor names
+        for name, row in self.sensor_rows.items():
+            self.table.setItem(row, 0, QTableWidgetItem(name))
+            self.table.setItem(row, 1, QTableWidgetItem("---"))
+            self.table.setItem(row, 2, QTableWidgetItem("---"))
+            self.table.setItem(row, 3, QTableWidgetItem("---"))
 
-    def update_data(self,data):
-        if data["name"]==self.name:
-            value= data["value"]
-            status= data["status"]
-            timestamp=data["timestamp"]
-            self.value_label.setText(f"Value: {value}")
-            self.time_label.setText(f"Timestamp: {timestamp}")
-            self.status_label.setText(f"Status: {status}")
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.table)
+
+    def update_table(self,data):
+        name = data.get("name")
+        if name in self.sensor_rows:
+            row = self.sensor_rows[name]
+            # Update specific cells
+            self.table.setItem(row, 1, QTableWidgetItem(str(data.get("value"))))
+            self.table.setItem(row, 2, QTableWidgetItem(str(data.get("timestamp"))))
+            self.table.setItem(row, 3, QTableWidgetItem(data.get("status")))
+
 
 
 #  --- Serial Setup ---
@@ -78,22 +94,9 @@ except Exception as e:
 
 app = QApplication(sys.argv)
 
-main = QWidget()
-layout = QVBoxLayout(main)
+window = MainWindow()
+window.show()
 
-temp_card = SensorCard("Temperature")
-hum_card = SensorCard("Humidity")
-Pre_card = SensorCard("Pressure")
-Speed_card = SensorCard("Speed")
-Count_card = SensorCard("Counter")
-
-layout.addWidget(temp_card)
-layout.addWidget(hum_card)
-layout.addWidget(Pre_card)
-layout.addWidget(Speed_card)
-layout.addWidget(Count_card)
-
-main.show()
 # Thread and worker setup
 thread = QThread()
 worker = Worker()
@@ -101,11 +104,7 @@ worker.moveToThread(thread)
 
 # Connect signals
 thread.started.connect(worker.run)       # start worker when thread starts
-worker.data_ready.connect(lambda val: temp_card.update_data(val))
-worker.data_ready.connect(lambda val: hum_card.update_data(val))
-worker.data_ready.connect(lambda val: Pre_card.update_data(val))
-worker.data_ready.connect(lambda val: Speed_card.update_data(val))
-worker.data_ready.connect(lambda val: Count_card.update_data(val))
+worker.data_ready.connect(lambda val: window.update_table(val))
 
 
 # Stop thread properly on exit
