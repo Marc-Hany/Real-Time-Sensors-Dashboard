@@ -5,10 +5,32 @@ from PySide6.QtCore import QTimer
 from datetime import datetime
 import pyqtgraph as pg
 import traceback
+import threading
+import requests
 import serial
 import time
 import json
 import sys
+
+WEBHOOK_URL="https://webhook.site/22d55c77-d3a2-4a36-9112-fd2b6e170b4c"
+
+def send_webhook(payload):
+    try:
+        response = requests.post(
+            WEBHOOK_URL,
+            json=payload,
+            timeout=5
+        )
+        print("Webhook sent:", response.status_code)
+    except Exception as e:
+        print("Webhook failed:", e)
+
+def trigger_webhook_async(payload):
+    threading.Thread(
+        target=send_webhook,
+        args=(payload,),
+        daemon=True
+    ).start()
 
 
 # 1. Define the Worker logic
@@ -199,6 +221,14 @@ class MainWindow(QWidget):
                                 log_entry = f"[{timestamp}] ALARM: {name} value below Low limit! (Value: {val})"
                                 self.alarm_log.appendPlainText(log_entry)
                                 self.value_alarm_active[name]=True
+                                payload = {
+                                            "event": "ALARM_TRIGGERED",
+                                            "sensor": name,
+                                            "value": val,
+                                            "timestamp": data.get("timestamp"),
+                                            "message": f"{name} Below Low limit"
+                                        }
+                                trigger_webhook_async(payload)
             
                 elif val > self.sensor_ranges[name][1]: 
                     for col in range(4):
@@ -208,6 +238,14 @@ class MainWindow(QWidget):
                             log_entry = f"[{timestamp}] ALARM: {name} value above High limit! (Value: {val})"
                             self.alarm_log.appendPlainText(log_entry)
                             self.value_alarm_active[name]=True
+                            payload = {
+                                            "event": "ALARM_TRIGGERED",
+                                            "sensor": name,
+                                            "value": val,
+                                            "timestamp": data.get("timestamp"),
+                                            "message": f"{name} Above Low limit"
+                                        }
+                            trigger_webhook_async(payload)
 
                 elif stat=="FAULTY": 
                     for col in range(4):
@@ -217,7 +255,16 @@ class MainWindow(QWidget):
                             log_entry = f"[{timestamp}] ALARM: {name} Sensor is FAULTY!"
                             self.alarm_log.appendPlainText(log_entry)
                             self.value_alarm_active[name]=True
-        except:
+                            payload = {
+                                            "event": "ALARM_TRIGGERED",
+                                            "sensor": name,
+                                            "value": val,
+                                            "timestamp": data.get("timestamp"),
+                                            "message": f"{name} Sensor Faulty"
+                                        }
+                            trigger_webhook_async(payload)
+
+        except Exception as e:
             print("CRASH INSIDE update_table:", e)
             traceback.print_exc()
                 
