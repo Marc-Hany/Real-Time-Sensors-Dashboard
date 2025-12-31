@@ -1,4 +1,12 @@
 {
+  "serial_config": {
+    "port": "COM2",
+    "baudrate": 115200,
+    "bytesize": 8,
+    "parity": "N",
+    "stopbits": 1,
+    "timeout": 1
+  },
   "Temperature": { "low": -50.0, "high": 50.0 },
   "Humidity": { "low": 10.0, "high": 90.0 },
   "Pressure": { "low": 100.0, "high": 900.0 },

@@ -4,6 +4,13 @@ import json
 import tkinter as tk
 from tkinter import ttk
 
+# Map JSON strings to PySerial constants
+PARITY_MAP = {
+    "N": serial.PARITY_NONE,
+    "E": serial.PARITY_EVEN,
+    "O": serial.PARITY_ODD
+}
+
 class Sensor:
     def __init__(self, name, value, status,Low,High):
         self.name = name
@@ -34,17 +41,24 @@ class Sensor:
         self.status = event.widget.get()
         # print(self.status)   
 
+# Open and load the Sensors JSON file
+with open('config/sensors.json', 'r') as file:
+    data = json.load(file)  #Create a Python dictionary
+
+# Extract serial settings
+s_cfg = data['serial_config']
+
 
 # --- Serial Setup ---
 try:
     # Open serial port (UART init)
     ser = serial.Serial(
-        port='COM1',        # change this to your COM port
-        baudrate=115200,
-        bytesize=serial.EIGHTBITS,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        timeout=1           # seconds
+        port=s_cfg['port'],
+        baudrate=s_cfg['baudrate'],
+        bytesize=s_cfg['bytesize'],
+        parity=PARITY_MAP.get(s_cfg['parity'], serial.PARITY_NONE),
+        stopbits=s_cfg['stopbits'],
+        timeout=s_cfg['timeout']
     )
     time.sleep(1)
 except Exception as e:
@@ -52,11 +66,9 @@ except Exception as e:
     ser = None
 
 
-# 1. Open and load the Sensors JSON file
-with open('config/Sensors.json', 'r') as file:
-    data = json.load(file)  #Create a Python dictionary
 
-# 2. Convert dictionary items into Sensor objects
+
+# Convert dictionary items into Sensor objects
 my_sensors = [
     Sensor(s['name'], s['value'], s['status'], s['min'], s['max']) 
     for s in data['sensors']

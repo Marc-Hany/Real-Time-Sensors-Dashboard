@@ -1,4 +1,12 @@
 {
+  "serial_config": {
+    "port": "COM1",
+    "baudrate": 115200,
+    "bytesize": 8,
+    "parity": "N",
+    "stopbits": 1,
+    "timeout": 1
+  },
   "sensors": [
     { "name": "Temperature", "value": 0, "status": "OK", "min": -100, "max": 100 },
     { "name": "Humidity", "value": 50.0, "status": "OK", "min": 0, "max": 100 },

@@ -2,6 +2,20 @@
 from PySide6.QtCore import QObject, Signal
 import serial, time, json
 
+# Map JSON strings to PySerial constants
+PARITY_MAP = {
+    "N": serial.PARITY_NONE,
+    "E": serial.PARITY_EVEN,
+    "O": serial.PARITY_ODD
+}
+
+# Load the config
+with open('config/ranges.json', 'r') as f:
+    config = json.load(f)
+
+# Extract serial settings
+s_cfg = config['serial_config']
+
 # Define the Worker logic (Serial Receive)
 class Worker(QObject):
     data_ready = Signal(dict)
@@ -13,12 +27,12 @@ class Worker(QObject):
         try:
             # Open serial port (UART init)
             self.ser = serial.Serial(
-                port='COM2',        # change this to your COM port
-                baudrate=115200,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=1           # seconds
+                port=s_cfg['port'],
+                baudrate=s_cfg['baudrate'],
+                bytesize=s_cfg['bytesize'],
+                parity=PARITY_MAP.get(s_cfg['parity'], serial.PARITY_NONE),
+                stopbits=s_cfg['stopbits'],
+                timeout=s_cfg['timeout']
             )
             time.sleep(1)
         except Exception as e:

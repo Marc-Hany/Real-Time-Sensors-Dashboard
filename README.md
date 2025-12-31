@@ -43,7 +43,7 @@ All inter-thread communication is handled using Qt signals and slots to ensure t
 #### 1. Clone the repository
 ```bash
 git clone github.com
-cd sensor-dashboard
+cd Real-Time-Sensors-Dashboard
 ```
 #### 2. Create a virtual environment
 ```bash
@@ -67,6 +67,9 @@ pip install -r requirements.txt
 ```bash
 python launcher.py
 ```
+> **Note:** Remember to update the serial settings in the configuration files as needed:  
+> - `com` in **sensors.json** is used by the **simulator**.  
+> - `com` in **ranges.json** is used by the **GUI**.
 ### Protocol Description
 -The system uses a JSON-over-Serial protocol for data exchange. This allows for easy debugging and flexibility compared to rigid binary protocols.
 
