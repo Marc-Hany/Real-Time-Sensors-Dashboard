@@ -55,11 +55,11 @@ except Exception as e:
 
 # --- 1. Define your Sensors ---
 my_sensors = [
-    Sensor("Temperature", 25.0, "OK",-100,100),
+    Sensor("Temperature", 0, "OK",-100,100),
     Sensor("Humidity", 50.0, "OK",0,100),
-    Sensor("Pressure", 52.2, "OK",0,1000),
-    Sensor("Speed", 100.0, "OK",0,255),
-    Sensor("Counter", 0, "OK",0,500)
+    Sensor("Pressure", 500.2, "OK",0,1000),
+    Sensor("Speed", 127.5, "OK",0,255),
+    Sensor("Counter", 250, "OK",0,500)
 ]
 
 # --- 2. Generic GUI Handler ---

@@ -180,22 +180,41 @@ class MainWindow(QWidget):
         try:
             name = data.get("name")
             val=data.get("value")
+            stat=data.get("status")
             if name in self.sensor_rows:
                 self.value_items[name].setText(str(data.get("value")))
                 self.timestamp_items[name].setText(str(datetime.fromtimestamp(data.get("timestamp"))))
                 self.status_items[name].setText(data.get("status"))
                 # Update plot
                 self.plot_widgets[name].add_point(data.get("value"),data.get("timestamp"))
-                if self.sensor_ranges[name][0] <= val <= self.sensor_ranges[name][1] :
+                if self.sensor_ranges[name][0] <= val <= self.sensor_ranges[name][1] and stat=="OK":
                     for col in range(4):
                         self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#433F3F")))
                         self.value_alarm_active[name]=False
-                else:
+                elif self.sensor_ranges[name][0] > val:
+                    for col in range(4):
+                            self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
+                            if self.value_alarm_active[name]==False:
+                                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                log_entry = f"[{timestamp}] ALARM: {name} value below Low limit! (Value: {val})"
+                                self.alarm_log.appendPlainText(log_entry)
+                                self.value_alarm_active[name]=True
+            
+                elif val > self.sensor_ranges[name][1]: 
                     for col in range(4):
                         self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
                         if self.value_alarm_active[name]==False:
-                            timestamp = datetime.now().strftime("%H:%M:%S")
-                            log_entry = f"[{timestamp}] ALARM: {name} out of range! (Value: {val})"
+                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            log_entry = f"[{timestamp}] ALARM: {name} value above High limit! (Value: {val})"
+                            self.alarm_log.appendPlainText(log_entry)
+                            self.value_alarm_active[name]=True
+
+                elif stat=="FAULTY": 
+                    for col in range(4):
+                        self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
+                        if self.value_alarm_active[name]==False:
+                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            log_entry = f"[{timestamp}] ALARM: {name} Sensor is FAULTY!"
                             self.alarm_log.appendPlainText(log_entry)
                             self.value_alarm_active[name]=True
         except:
