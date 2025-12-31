@@ -2,9 +2,8 @@ import subprocess
 import time
 
 # Start both scripts as background processes
-# process1 = subprocess.Popen(['python', 'Dashboard.py'])
-process1 = subprocess.Popen(['python', 'GUI.py'])
-process2 = subprocess.Popen(['python', 'Sensor Simulator.py'])
+process1 = subprocess.Popen(['python', 'src/gui.py'])
+process2 = subprocess.Popen(['python', 'src/simulator.py'])
 
 try:
     while True:

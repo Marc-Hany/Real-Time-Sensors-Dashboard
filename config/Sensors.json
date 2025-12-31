@@ -1,0 +1,9 @@
+{
+  "sensors": [
+    { "name": "Temperature", "value": 0, "status": "OK", "min": -100, "max": 100 },
+    { "name": "Humidity", "value": 50.0, "status": "OK", "min": 0, "max": 100 },
+    { "name": "Pressure", "value": 500.2, "status": "OK", "min": 0, "max": 1000 },
+    { "name": "Speed", "value": 127.5, "status": "OK", "min": 0, "max": 255 },
+    { "name": "Counter", "value": 250, "status": "OK", "min": 0, "max": 500 }
+  ]
+}

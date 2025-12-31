@@ -21,7 +21,6 @@ class Sensor:
         }
         json_payload = json.dumps(data) + "\n"
         ser.write(json_payload.encode('utf-8'))
-        # print(f"Sent JSON: {json_payload.strip()}")
 
     def update_value(self,val):
          # If original value was int, store as int; otherwise float
@@ -53,20 +52,19 @@ except Exception as e:
     ser = None
 
 
-# --- 1. Define your Sensors ---
+# 1. Open and load the Sensors JSON file
+with open('config/Sensors.json', 'r') as file:
+    data = json.load(file)  #Create a Python dictionary
+
+# 2. Convert dictionary items into Sensor objects
 my_sensors = [
-    Sensor("Temperature", 0, "OK",-100,100),
-    Sensor("Humidity", 50.0, "OK",0,100),
-    Sensor("Pressure", 500.2, "OK",0,1000),
-    Sensor("Speed", 127.5, "OK",0,255),
-    Sensor("Counter", 250, "OK",0,500)
+    Sensor(s['name'], s['value'], s['status'], s['min'], s['max']) 
+    for s in data['sensors']
 ]
 
 # --- 2. Generic GUI Handler ---
 def handle_send():
         # # Update the specific sensor object with values from its specific UI widgets
-        # sensor.value = round(slider.get(), 2)
-        # sensor.status = status_var.get()
         for sensor in my_sensors:
             # Send the data
             sensor.send_sensor_data()
@@ -75,6 +73,7 @@ def handle_send():
             log.insert(tk.END, f"[{sensor.name}] Value: {sensor.value}, Status: {sensor.status}\n")
             log.see(tk.END)
         root.after(500,handle_send)
+
 # --- 3. Building the UI ---
 root = tk.Tk()
 root.title("Sensors Dashboard")
@@ -120,15 +119,6 @@ for s in my_sensors:
     stat_menu.bind("<<ComboboxSelected>>", lambda e, s=s: s.update_status(e))
     stat_menu.pack(side="left", padx=10)
 
-    # Button linked to THIS sensor instance
-    # We use 'lambda' to "freeze" the current sensor and its widgets into the button
-    # btn = tk.Button(frame, text="Send", 
-    #                 command=lambda s=s, sl=val_slider, sv=stat_var: handle_send(s, sl, sv))
-    # btn.pack(side="right")
-
-# Action Button
-# send_btn = tk.Button(root, text="SEND DATA", command=handle_send, bg="#2196F3", fg="white", width=20)
-# send_btn.pack(pady=20)
 
 # Activity Log
 log = tk.Text(root, height=10, width=50)

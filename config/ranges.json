@@ -1,0 +1,7 @@
+{
+  "Temperature": { "low": -50.0, "high": 50.0 },
+  "Humidity": { "low": 10.0, "high": 90.0 },
+  "Pressure": { "low": 100.0, "high": 900.0 },
+  "Speed": { "low": 50.0, "high": 200.0 },
+  "Counter": { "low": 10.0, "high": 400.0 }
+}

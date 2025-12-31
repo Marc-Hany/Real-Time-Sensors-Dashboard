@@ -1,17 +1,19 @@
+# gui/main.py
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QThread
+from worker import Worker
+from plots import SensorPlotWidget
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,QLabel,QPlainTextEdit)
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QThread
 from PySide6.QtGui import QColor, QBrush
-from PySide6.QtCore import QTimer
 from datetime import datetime
-import pyqtgraph as pg
 import traceback
 import threading
 import requests
-import serial
-import time
 import json
 import sys
 
+# Webhook URL and Functions
 WEBHOOK_URL="https://webhook.site/22d55c77-d3a2-4a36-9112-fd2b6e170b4c"
 
 def send_webhook(payload):
@@ -33,89 +35,8 @@ def trigger_webhook_async(payload):
     ).start()
 
 
-# 1. Define the Worker logic
-class Worker(QObject):
-    data_ready = Signal(dict)
 
-    def __init__(self):
-        super().__init__()
-        self._running = True
-                #  --- Serial Setup ---
-        try:
-            # Open serial port (UART init)
-            self.ser = serial.Serial(
-                port='COM2',        # change this to your COM port
-                baudrate=115200,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=1           # seconds
-            )
-            time.sleep(1)
-        except Exception as e:
-            print(f"Serial Error: {e}. Running in simulation mode (no hardware).")
-            self.ser = None
-
-    def run(self):
-        while self._running:
-            if self.ser and self.ser.is_open:
-                try:
-                    # readline() reads until \n and returns bytes
-                    line = self.ser.readline()
-                    
-                    # Convert bytes to string and remove trailing whitespace (\n, \r)
-                    decoded_line = line.decode('utf-8').strip()
-                    if decoded_line:
-                        # 2. Parse the JSON string into a Python dictionary
-                        data = json.loads(decoded_line)
-                        # print(data)
-                        self.data_ready.emit(data)    # emit signal instead of queue
-                except Exception as e:
-                    print(f"Error: {e}")
-
-    def stop(self):
-        self._running = False
-
-
-class SensorPlotWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-
-        self.time_data = []   # timestamps (seconds)
-        self.value_data = []  # sensor values
-        self.window = 20      # seconds
-
-        self.plot = pg.PlotWidget()
-        self.plot.setBackground("w")
-        self.plot.showGrid(x=True, y=True)
-
-        self.curve = self.plot.plot(pen=pg.mkPen(color="b", width=2))
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.plot)
-
-    def add_point(self, value, timestamp):
-        # 1. Append new data
-        self.time_data.append(timestamp)
-        self.value_data.append(value)
-
-        # 2. Remove old data (rolling window)
-        cutoff = time.time() - self.window
-        while self.time_data and self.time_data[0] < cutoff:
-            self.time_data.pop(0)
-            self.value_data.pop(0)
-
-        # 3. Convert to relative time (0 → window seconds)
-        t0 = self.time_data[0]
-        x = [t - t0 for t in self.time_data]
-
-        # 4. Update plot
-        self.curve.setData(x, self.value_data)
-
-
-
+# Main Window
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -129,12 +50,10 @@ class MainWindow(QWidget):
 
         # Make columns stretch to fit window
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        self.sensor_ranges = {"Temperature": (-50.0, 50.0),
-                              "Humidity": (10.0, 90.0),
-                              "Pressure": (100.0, 900.0),
-                              "Speed": (50.0, 200.0),
-                              "Counter": (10.0, 400.0)}
+        
+        # Load the configuration file for sensors ranges
+        with open('config/ranges.json', 'r') as f:
+            self.sensor_ranges = json.load(f)
 
         # 2. Define rows for each sensor
         self.sensor_rows = {
@@ -178,7 +97,7 @@ class MainWindow(QWidget):
 
         self.value_alarm_active = {name: False for name in self.sensor_rows}
         
-        # 1. Create the Label
+        # Create the Label for global status
         self.indicator = QLabel("System Status")
         self.indicator.setStyleSheet("background-color: red; color: white; padding: 5px; font-weight: bold;")
 
@@ -191,7 +110,7 @@ class MainWindow(QWidget):
 
         layout = QVBoxLayout(self)
 
-        # 3. Add Label FIRST (Top)
+        # Add Widgets to Layout
         layout.addWidget(self.indicator)
         layout.addWidget(self.table)
         layout.addWidget(self.log_header)
@@ -203,17 +122,21 @@ class MainWindow(QWidget):
             name = data.get("name")
             val=data.get("value")
             stat=data.get("status")
+            # Update Values
             if name in self.sensor_rows:
                 self.value_items[name].setText(str(data.get("value")))
                 self.timestamp_items[name].setText(str(datetime.fromtimestamp(data.get("timestamp"))))
                 self.status_items[name].setText(data.get("status"))
                 # Update plot
                 self.plot_widgets[name].add_point(data.get("value"),data.get("timestamp"))
-                if self.sensor_ranges[name][0] <= val <= self.sensor_ranges[name][1] and stat=="OK":
+
+                # Check for errors and set alarms
+                if self.sensor_ranges[name].get("low") <= val <= self.sensor_ranges[name].get("high") and stat=="OK":
                     for col in range(4):
                         self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#433F3F")))
                         self.value_alarm_active[name]=False
-                elif self.sensor_ranges[name][0] > val:
+                        
+                elif self.sensor_ranges[name].get("low") > val:
                     for col in range(4):
                             self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
                             if self.value_alarm_active[name]==False:
@@ -230,7 +153,7 @@ class MainWindow(QWidget):
                                         }
                                 trigger_webhook_async(payload)
             
-                elif val > self.sensor_ranges[name][1]: 
+                elif val > self.sensor_ranges[name].get("high"): 
                     for col in range(4):
                         self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
                         if self.value_alarm_active[name]==False:
@@ -243,7 +166,7 @@ class MainWindow(QWidget):
                                             "sensor": name,
                                             "value": val,
                                             "timestamp": data.get("timestamp"),
-                                            "message": f"{name} Above Low limit"
+                                            "message": f"{name} Above High limit"
                                         }
                             trigger_webhook_async(payload)
 
@@ -268,7 +191,7 @@ class MainWindow(QWidget):
             print("CRASH INSIDE update_table:", e)
             traceback.print_exc()
                 
-        # 2. Extract all current statuses from the table items
+        # Extract all current statuses from the table items
         # This checks if ANY sensor row currently says something other than "OK"
         current_statuses = [item.text() for item in self.status_items.values()]
         
@@ -287,7 +210,7 @@ class MainWindow(QWidget):
             self.indicator.setStyleSheet("background-color: red; border-radius: 10px;")
                 
 
-
+# Main App
 app = QApplication(sys.argv)
 
 window = MainWindow()
