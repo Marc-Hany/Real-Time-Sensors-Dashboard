@@ -5,7 +5,7 @@ from worker import Worker
 from plots import SensorPlotWidget
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,QLabel,QPlainTextEdit)
 from PySide6.QtCore import QThread
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtGui import QColor, QBrush,QTextCursor
 from datetime import datetime
 import traceback
 import threading
@@ -96,6 +96,7 @@ class MainWindow(QWidget):
         self.table.setColumnWidth(4, 300)
 
         self.value_alarm_active = {name: False for name in self.sensor_rows}
+        self.value_alarm_Fault_active = {name: False for name in self.sensor_rows}
         
         # Create the Label for global status
         self.indicator = QLabel("System Status")
@@ -105,6 +106,7 @@ class MainWindow(QWidget):
         self.alarm_log = QPlainTextEdit()
         self.alarm_log.setReadOnly(True)
         self.alarm_log.setMaximumBlockCount(100) # Keep only the last 100 entries
+        self.alarm_log.setMaximumHeight(150)  # px, adjust as you like
         self.alarm_log.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: Consolas;")
         
 
@@ -135,6 +137,7 @@ class MainWindow(QWidget):
                     for col in range(4):
                         self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#433F3F")))
                         self.value_alarm_active[name]=False
+                        self.value_alarm_Fault_active[name] = False
                         
                 elif self.sensor_ranges[name].get("low") > val:
                     for col in range(4):
@@ -143,6 +146,7 @@ class MainWindow(QWidget):
                                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 log_entry = f"[{timestamp}] ALARM: {name} value below Low limit! (Value: {val})"
                                 self.alarm_log.appendPlainText(log_entry)
+                                self.alarm_log.moveCursor(QTextCursor.End)
                                 self.value_alarm_active[name]=True
                                 payload = {
                                             "event": "ALARM_TRIGGERED",
@@ -160,6 +164,7 @@ class MainWindow(QWidget):
                             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             log_entry = f"[{timestamp}] ALARM: {name} value above High limit! (Value: {val})"
                             self.alarm_log.appendPlainText(log_entry)
+                            self.alarm_log.moveCursor(QTextCursor.End)
                             self.value_alarm_active[name]=True
                             payload = {
                                             "event": "ALARM_TRIGGERED",
@@ -169,15 +174,18 @@ class MainWindow(QWidget):
                                             "message": f"{name} Above High limit"
                                         }
                             trigger_webhook_async(payload)
+                else:
+                    self.value_alarm_active[name]=False
 
-                elif stat=="FAULTY": 
+                if stat=="FAULTY": 
                     for col in range(4):
                         self.table.item(self.sensor_rows.get(name),col).setBackground(QBrush(QColor("#F70707")))
-                        if self.value_alarm_active[name]==False:
+                        if self.value_alarm_Fault_active[name]==False:
                             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             log_entry = f"[{timestamp}] ALARM: {name} Sensor is FAULTY!"
                             self.alarm_log.appendPlainText(log_entry)
-                            self.value_alarm_active[name]=True
+                            self.alarm_log.moveCursor(QTextCursor.End)
+                            self.value_alarm_Fault_active[name]=True
                             payload = {
                                             "event": "ALARM_TRIGGERED",
                                             "sensor": name,
